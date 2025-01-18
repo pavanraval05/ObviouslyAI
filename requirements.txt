@@ -117,8 +117,6 @@ python-jose
 python-json-logger
 python-multipart
 pytz
-pywin32
-pywinpty
 PyYAML
 pyzmq
 referencing
