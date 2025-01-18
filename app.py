@@ -5,21 +5,17 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field, ValidationError
 from datetime import date, datetime, timedelta
 from typing import List, Dict, Optional
-from sqlalchemy import create_engine, Column, Integer, String, Date
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
 from math import ceil
 from jose import jwt, JWTError
 from passlib.context import CryptContext
+import sqlitecloud
 
 # Initialize the app
 app = FastAPI()
 
-# Database setup
+# Open the connection to SQLite Cloud
 DATABASE_URL = "sqlitecloud://cmn6x4qvhz.g6.sqlite.cloud:8860/books.db?apikey=0fbMBtLzIYN4l62Bdsw6zE9AYlpNn87V5Pc8ySHbmOQ"
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+conn = sqlitecloud.connect(DATABASE_URL)
 
 # Secret key to encode the JWT
 SECRET_KEY = "your_secret_key"
@@ -69,16 +65,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# SQLAlchemy model for the books table
-class BookDB(Base):
-    __tablename__ = "books"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    title = Column(String, index=True)
-    author = Column(String, index=True)
-    published_date = Column(Date)
-    summary = Column(String)
-    genre = Column(String)
-
 # Pydantic model for request and response
 class Token(BaseModel):
     access_token: str
@@ -104,17 +90,6 @@ class PaginatedBooks(BaseModel):
     total_pages: int
     current_page: int
     books: List[Book]
-
-# Create the database tables
-Base.metadata.create_all(bind=engine)
-
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -151,13 +126,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 # Route to get a list of books
 @app.get("/read", response_model=PaginatedBooks)
-def get_books(page: int = Query(1, ge=1), per_page: int = Query(10, ge=1, le=100), db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def get_books(page: int = Query(1, ge=1), per_page: int = Query(10, ge=1, le=100), current_user: dict = Depends(get_current_user)):
     try:
-        total_books = db.query(BookDB).count()
+        cursor = conn.execute('SELECT COUNT(*) FROM books;')
+        total_books = cursor.fetchone()[0]
         total_pages = ceil(total_books / per_page)
         offset = (page - 1) * per_page
-        books_db = db.query(BookDB).offset(offset).limit(per_page).all()
-        books = [Book.from_orm(book) for book in books_db]
+        cursor = conn.execute(f'SELECT * FROM books LIMIT {per_page} OFFSET {offset};')
+        books_db = cursor.fetchall()
+        books = [Book(id=row[0], title=row[1], author=row[2], published_date=row[3], summary=row[4], genre=row[5]) for row in books_db]
         return PaginatedBooks(
             total_books=total_books,
             total_pages=total_pages,
@@ -180,52 +157,51 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 @app.post("/create", response_model=Book, status_code=status.HTTP_201_CREATED)
-def create_book(book: Book, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def create_book(book: Book, current_user: dict = Depends(get_current_user)):
     try:
-        new_book = BookDB(
-            title=book.title,
-            author=book.author,
-            published_date=book.published_date,
-            summary=book.summary,
-            genre=book.genre
+        cursor = conn.execute(
+            'INSERT INTO books (title, author, published_date, summary, genre) VALUES (?, ?, ?, ?, ?);',
+            (book.title, book.author, book.published_date, book.summary, book.genre)
         )
-        db.add(new_book)
-        db.commit()
-        db.refresh(new_book)
-        return new_book
+        conn.commit()
+        book_id = cursor.lastrowid
+        return Book(id=book_id, **book.dict())
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.put("/update/{book_id}", response_model=Book)
-def update_book(book_id: int, update_data: BookUpdate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def update_book(book_id: int, update_data: BookUpdate, current_user: dict = Depends(get_current_user)):
     try:
-        book = db.query(BookDB).filter(BookDB.id == book_id).first()
+        cursor = conn.execute('SELECT * FROM books WHERE id = ?;', (book_id,))
+        book = cursor.fetchone()
         if not book:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
         
         for field, value in update_data.updates.items():
-            if hasattr(book, field):
-                setattr(book, field, value)
+            if field in ['title', 'author', 'published_date', 'summary', 'genre']:
+                conn.execute(f'UPDATE books SET {field} = ? WHERE id = ?;', (value, book_id))
             else:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid field name: {field}")
         
-        db.commit()
-        db.refresh(book)
-        return book
+        conn.commit()
+        cursor = conn.execute('SELECT * FROM books WHERE id = ?;', (book_id,))
+        updated_book = cursor.fetchone()
+        return Book(id=updated_book[0], title=updated_book[1], author=updated_book[2], published_date=updated_book[3], summary=updated_book[4], genre=updated_book[5])
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.errors())
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.delete("/delete/{book_id}", response_model=dict)
-def delete_book(book_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+def delete_book(book_id: int, current_user: dict = Depends(get_current_user)):
     try:
-        book = db.query(BookDB).filter(BookDB.id == book_id).first()
+        cursor = conn.execute('SELECT * FROM books WHERE id = ?;', (book_id,))
+        book = cursor.fetchone()
         if not book:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
         
-        db.delete(book)
-        db.commit()
+        conn.execute('DELETE FROM books WHERE id = ?;', (book_id,))
+        conn.commit()
         return {"detail": "Book deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
