@@ -17,7 +17,7 @@ This is a FastAPI application for managing a collection of books. It provides en
 ## Technologies Used
 
 - **FastAPI**: A modern, fast (high-performance) web framework for building APIs with Python 3.7+.
-- **SQLAlchemy**: A SQL toolkit and Object-Relational Mapping (ORM) system for Python.
+- **SQLite Cloud**: SQLite databases in cloud environments.
 - **SQLite**: A lightweight, disk-based database.
 - **Pydantic**: Data validation and settings management using Python type annotations.
 - **JWT**: JSON Web Tokens for secure user authentication.
