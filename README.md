@@ -1,6 +1,6 @@
 # FastAPI Book Management Application
 
-This is a FastAPI application for managing a collection of books. It provides endpoints for creating, reading, updating, and deleting book records. The application also includes user authentication using OAuth2 with JWT tokens.
+This is a FastAPI application for managing a collection of books. It provides endpoints for creating, reading, updating, and deleting book records. The application also includes user authentication using JWT tokens.
 
 ## Demo
 
