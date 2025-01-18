@@ -2,6 +2,10 @@
 
 This is a FastAPI application for managing a collection of books. It provides endpoints for creating, reading, updating, and deleting book records. The application also includes user authentication using OAuth2 with JWT tokens.
 
+## Demo
+
+[ObviouslyAI - Demo](https://obviouslyai-7e45a676f5a1.herokuapp.com/docs)
+
 ## Features
 
 - **User Authentication**: Secure access using OAuth2 with JWT tokens.
