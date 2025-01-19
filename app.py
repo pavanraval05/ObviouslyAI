@@ -165,7 +165,7 @@ def create_book(book: Book, current_user: dict = Depends(get_current_user)):
         )
         conn.commit()
         book_id = cursor.lastrowid
-        return Book(id=book_id, **book.dict())
+        return Book(id=book_id, **book.dict(exclude={"id"}))  # Fix applied
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
