@@ -78,3 +78,83 @@ This is a FastAPI application for managing a collection of books. It provides en
 - **Authentication Errors**: Returns a 401 status code if credentials are invalid.
 - **Not Found Errors**: Returns a 404 status code if a book is not found.
 - **Server Errors**: Returns a 500 status code for unexpected server errors.
+
+
+
+
+
+# To Test Book Management API
+
+## 1. Create a Book (POST /create)
+
+To create a new book, the JSON body should contain the `title`, `author`, `published_date`, `summary`, and `genre`:
+
+```json
+{
+  "title": "To Kill a Mockingbird",
+  "author": "Harper Lee",
+  "published_date": "1960-07-11",
+  "summary": "A novel about the serious issues of rape and racial inequality.",
+  "genre": "Fiction"
+}
+```
+
+## 2. Update a Book (PUT /update/{book_id})
+
+To update a book, the JSON body should contain an `updates` object with the fields you want to update. For example, to update the `title` and `summary`:
+
+```json
+{
+  "updates": {
+    "title": "To Kill a Mockingbird - Updated Edition",
+    "summary": "A gripping novel about the serious issues of racial inequality and justice."
+  }
+}
+```
+
+## 3. Delete a Book (DELETE /delete/{book_id})
+
+To delete a book, you don't need to send a body. You only need to specify the `book_id` in the URL. For example, to delete the book with ID `123`:
+
+```bash
+DELETE /delete/123
+```
+
+No JSON body is required for this request.
+
+## 4. Read Books (List of Books) (GET /read)
+
+To retrieve a list of books, the query parameters `page` and `per_page` can be used to control pagination. Example URL with query parameters:
+
+```bash
+GET /read?page=1&per_page=10
+```
+
+This will return a paginated list of books with the following structure:
+
+```json
+{
+  "total_books": 100,
+  "total_pages": 10,
+  "current_page": 1,
+  "books": [
+    {
+      "id": 1,
+      "title": "To Kill a Mockingbird",
+      "author": "Harper Lee",
+      "published_date": "1960-07-11",
+      "summary": "A novel about the serious issues of rape and racial inequality.",
+      "genre": "Fiction"
+    },
+    {
+      "id": 2,
+      "title": "1984",
+      "author": "George Orwell",
+      "published_date": "1949-06-08",
+      "summary": "A dystopian novel about totalitarianism and surveillance.",
+      "genre": "Dystopian"
+    }
+  ]
+}
+```
+
